@@ -76,12 +76,21 @@ function initializeSheets() {
       gardensWorksheet.getRange(1, 1, 1, 3).setValues([['Garden Name', 'Location', 'Active']]);
       gardensWorksheet.getRange(1, 1, 1, 3).setFontWeight('bold');
       
-      // Add some sample gardens
-      gardensWorksheet.getRange(2, 1, 4, 3).setValues([
-        ['Community Garden North', '123 North St', 'Yes'],
-        ['Community Garden South', '456 South Ave', 'Yes'],
-        ['Butterfly Garden', '789 East Rd', 'Yes'],
-        ['Herb Garden', '321 West Blvd', 'Yes']
+      // Add the default list of gardens
+      gardensWorksheet.getRange(2, 1, 13, 3).setValues([
+        ["Harcourt/Canton", "", "Yes"],
+        ["Holyoke area", "", "Yes"],
+        ["Follen/Braddock Corner", "", "Yes"],
+        ["Follen and Braddock Hills/Lawyer's Alley", "", "Yes"],
+        ["Newton 4 Corners", "", "Yes"],
+        ["Durham/Rutland Gardens", "", "Yes"],
+        ["Greenwich Area Gardens", "", "Yes"],
+        ["Claremont/Blackwood Area", "", "Yes"],
+        ["Wellington", "", "Yes"],
+        ["Rose Garden", "", "Yes"],
+        ["Meadow", "", "Yes"],
+        ["Mass Ave Gardens", "", "Yes"],
+        ["Northampton/Camden", "", "Yes"]
       ]);
     }
     
