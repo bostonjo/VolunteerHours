@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Volunteer Hours Tracker</title>
+    <?!= include('VolunteerStyle'); ?>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌱 Volunteer Hours Tracker</h1>
+            <p>Thank you for your dedication to our community gardens!</p>
+        </header>
+
+        <main>
+            <div class="form-container">
+                <form id="volunteerForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="volunteerName">Your Name *</label>
+                            <input type="text" id="volunteerName" name="volunteerName" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">Email Address *</label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="startDate">Start Date *</label>
+                            <input type="date" id="startDate" name="startDate" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="endDate">End Date (if different)</label>
+                            <input type="date" id="endDate" name="endDate">
+                            <small>Leave blank if you volunteered on a single day</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="gardens">Garden(s) Worked In *</label>
+                        <div class="gardens-container">
+                            <div class="selected-gardens">
+                                <span class="selected-gardens-label">Selected Gardens:</span>
+                                <div id="selectedGardensList" class="selected-gardens-list">
+                                    <div class="gardens-placeholder">Click "Search & Add Gardens" to select gardens</div>
+                                </div>
+                            </div>
+                            
+                            <div class="garden-search">
+                                <input type="text" id="gardenSearchInput" placeholder="Search gardens by name or location...">
+                            </div>
+                            
+                            <div id="gardensDropdown" class="gardens-dropdown">
+                                <!-- Search results will appear here -->
+                            </div>
+                            
+                            <div class="gardens-help">
+                                Type to search, click to select multiple gardens
+                            </div>
+                        </div>
+                        <small>Select all gardens where you volunteered</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="hours">Total Hours Volunteered *</label>
+                        <input type="number" id="hours" name="hours" min="0.5" step="0.5" required>
+                        <small>Please enter your total hours (e.g., 2.5 for 2 hours and 30 minutes)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="comments">Comments (Optional)</label>
+                        <textarea id="comments" name="comments" rows="4" 
+                                  placeholder="Tell us about your volunteer experience, tasks completed, or any other notes..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Submit Volunteer Hours</button>
+                </form>
+            </div>
+        </main>
+
+        <footer>
+            <p>Questions? Contact us at volunteer@yourdomain.com</p>
+            <p><a href="#" id="adminLink" class="admin-link">Admin Portal</a></p>
+        </footer>
+
+        <!-- Loading and Status -->
+        <div id="loading" class="loading hidden">Submitting your hours...</div>
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        let gardensData = [];
+        let selectedGardens = [];
+
+        // Load gardens when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadGardens();
+            
+            // Set max date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('startDate').max = today;
+            document.getElementById('endDate').max = today;
+            
+            // Set up admin link with correct URL
+            setupAdminLink();
+            
+            // Set up garden search functionality
+            setupGardenSearch();
+        });
+        
+        // Set up garden search and selection
+        function setupGardenSearch() {
+            const searchInput = document.getElementById('gardenSearchInput');
+            const dropdown = document.getElementById('gardensDropdown');
+            
+            searchInput.addEventListener('input', function(e) {
+                const searchTerm = e.target.value.trim();
+                if (searchTerm.length >= 2) {
+                    filterAndShowGardens(searchTerm);
+                    dropdown.classList.add('show');
+                } else {
+                    dropdown.classList.remove('show');
+                }
+            });
+            
+            searchInput.addEventListener('focus', function(e) {
+                const searchTerm = e.target.value.trim();
+                if (searchTerm.length >= 2) {
+                    dropdown.classList.add('show');
+                }
+            });
+            
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.gardens-container')) {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+        
+        // Filter and display gardens based on search
+        function filterAndShowGardens(searchTerm) {
+            const dropdown = document.getElementById('gardensDropdown');
+            const filteredGardens = gardensData.filter(garden => {
+                const name = garden.name.toLowerCase();
+                const location = (garden.location || '').toLowerCase();
+                const search = searchTerm.toLowerCase();
+                return name.includes(search) || location.includes(search);
+            });
+            
+            if (filteredGardens.length === 0) {
+                dropdown.innerHTML = '<div class="no-gardens-found">No gardens found matching your search</div>';
+                return;
+            }
+            
+            let html = '';
+            filteredGardens.forEach(garden => {
+                const isSelected = selectedGardens.some(selected => selected.name === garden.name);
+                html += `
+                    <div class="garden-option ${isSelected ? 'selected' : ''}" onclick="toggleGarden('${garden.name}', '${garden.location || ''}')">
+                        <div class="garden-info">
+                            <div class="garden-name">${garden.name}</div>
+                            ${garden.location ? `<div class="garden-location">${garden.location}</div>` : ''}
+                        </div>
+                        ${isSelected ? '<div class="checkmark">✓</div>' : ''}
+                    </div>
+                `;
+            });
+            
+            dropdown.innerHTML = html;
+        }
+        
+        // Toggle garden selection
+        function toggleGarden(gardenName, gardenLocation) {
+            const existingIndex = selectedGardens.findIndex(garden => garden.name === gardenName);
+            
+            if (existingIndex > -1) {
+                // Remove garden
+                selectedGardens.splice(existingIndex, 1);
+            } else {
+                // Add garden
+                selectedGardens.push({ name: gardenName, location: gardenLocation });
+            }
+            
+            updateSelectedGardensDisplay();
+            
+            // Update the search results to show new selection state
+            const searchTerm = document.getElementById('gardenSearchInput').value.trim();
+            if (searchTerm.length >= 2) {
+                filterAndShowGardens(searchTerm);
+            }
+        }
+        
+        // Update the display of selected gardens
+        function updateSelectedGardensDisplay() {
+            const container = document.getElementById('selectedGardensList');
+            
+            if (selectedGardens.length === 0) {
+                container.innerHTML = '<div class="gardens-placeholder">Click "Search & Add Gardens" to select gardens</div>';
+                container.classList.remove('has-selections');
+                return;
+            }
+            
+            container.classList.add('has-selections');
+            let html = '';
+            selectedGardens.forEach(garden => {
+                html += `
+                    <div class="selected-garden-tag">
+                        <span>${garden.name}</span>
+                        <button type="button" class="remove-btn" onclick="removeGarden('${garden.name}')" title="Remove garden">×</button>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // Remove a selected garden
+        function removeGarden(gardenName) {
+            const index = selectedGardens.findIndex(garden => garden.name === gardenName);
+            if (index > -1) {
+                selectedGardens.splice(index, 1);
+                updateSelectedGardensDisplay();
+                
+                // Update search results if dropdown is visible
+                const dropdown = document.getElementById('gardensDropdown');
+                if (dropdown.classList.contains('show')) {
+                    const searchTerm = document.getElementById('gardenSearchInput').value.trim();
+                    if (searchTerm.length >= 2) {
+                        filterAndShowGardens(searchTerm);
+                    }
+                }
+            }
+        }
+        
+        // Set up admin link with current URL
+        function setupAdminLink() {
+            // Hard-code the correct base URL
+            const baseUrl = 'https://script.google.com/macros/s/AKfycbyGx8K_ZcqRR2b5nKnX4rL128AvhbLi5AgkN3HGGujhcD9qpMuEaTvGz99URrPFikHn/exec';
+            const adminUrl = baseUrl + '?page=admin';
+            
+            console.log('Setting admin URL to:', adminUrl); // Debug log
+            document.getElementById('adminLink').href = adminUrl;
+        }
+
+        // Form submission handler
+        document.getElementById('volunteerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (selectedGardens.length === 0) {
+                showStatus('Please select at least one garden', 'error');
+                return;
+            }
+            
+            const formData = {
+                volunteerName: document.getElementById('volunteerName').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                startDate: document.getElementById('startDate').value,
+                endDate: document.getElementById('endDate').value,
+                gardens: selectedGardens.map(g => g.name), // Convert to array of names
+                hours: parseFloat(document.getElementById('hours').value),
+                comments: document.getElementById('comments').value.trim()
+            };
+            
+            // Validate dates
+            if (formData.endDate && new Date(formData.endDate) < new Date(formData.startDate)) {
+                showStatus('End date cannot be before start date', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            showStatus('Submitting your volunteer hours...', 'info');
+            
+            google.script.run
+                .withSuccessHandler(handleSubmitSuccess)
+                .withFailureHandler(handleError)
+                .submitVolunteerHours(formData);
+        });
+
+        // Load gardens from the server
+        function loadGardens() {
+            google.script.run
+                .withSuccessHandler(displayGardens)
+                .withFailureHandler(handleError)
+                .getGardens();
+        }
+
+        // Display gardens (just store the data now)
+        function displayGardens(result) {
+            if (result.success) {
+                gardensData = result.gardens;
+                
+                if (gardensData.length === 0) {
+                    document.getElementById('selectedGardensList').innerHTML = '<div class="gardens-placeholder">No gardens available. Please contact the administrator.</div>';
+                    return;
+                }
+                
+                console.log(`Loaded ${gardensData.length} gardens`);
+            } else {
+                showStatus('Error loading gardens: ' + result.message, 'error');
+            }
+        }
+
+        // Success handler for form submission
+        function handleSubmitSuccess(result) {
+            showLoading(false);
+            
+            if (result.success) {
+                showStatus(result.message, 'success');
+                document.getElementById('volunteerForm').reset();
+                
+                // Clear selected gardens
+                selectedGardens = [];
+                updateSelectedGardensDisplay();
+                
+                // Clear search
+                document.getElementById('gardenSearchInput').value = '';
+                document.getElementById('gardensDropdown').classList.remove('show');
+                
+                // Scroll to top to show success message
+                window.scrollTo(0, 0);
+            } else {
+                showStatus('Error: ' + result.message, 'error');
+            }
+        }
+
+        // Error handler
+        function handleError(error) {
+            showLoading(false);
+            console.error('Error:', error);
+            showStatus('An error occurred: ' + error.message, 'error');
+        }
+
+        // Utility functions
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            if (show) {
+                loading.classList.remove('hidden');
+            } else {
+                loading.classList.add('hidden');
+            }
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            
+            // Auto-hide success/info messages after 8 seconds
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    if (status.className.includes(type)) {
+                        status.textContent = '';
+                        status.className = 'status';
+                    }
+                }, 8000);
+            }
+        }
+    </script>
+</body>
+</html>

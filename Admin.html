@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Volunteer Hours - Admin Portal</title>
+    <?!= include('AdminStyle'); ?>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 Admin Portal</h1>
+            <p>Manage gardens and generate volunteer reports</p>
+            <div class="auth-info">
+                <span id="userInfo"></span>
+                <a href="https://script.google.com/macros/s/AKfycbyGx8K_ZcqRR2b5nKnX4rL128AvhbLi5AgkN3HGGujhcD9qpMuEaTvGz99URrPFikHn/exec" class="volunteer-link">← Back to Volunteer Form</a>
+            </div>
+        </header>
+
+        <div id="authContainer" class="auth-container">
+            <div class="auth-card">
+                <h2>Admin Authentication Required</h2>
+                <p>Checking your permissions...</p>
+                <div class="loading-spinner"></div>
+            </div>
+        </div>
+
+        <main id="adminContent" class="hidden">
+            <section class="dashboard">
+                <h2>📊 Dashboard</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3 id="totalVolunteers">-</h3>
+                        <p>Total Volunteers</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="totalHours">-</h3>
+                        <p>Total Hours</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="totalEntries">-</h3>
+                        <p>Total Entries</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="averageHours">-</h3>
+                        <p>Avg Hours/Entry</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="garden-management">
+                <div class="section-header">
+                    <h2>🌻 Garden Management</h2>
+                    <button id="addGardenBtn" class="btn btn-primary">Add New Garden</button>
+                </div>
+                
+                <div class="garden-search">
+                    <input type="text" id="gardenSearchInput" placeholder="Search gardens by name or location...">
+                </div>
+                
+                <div class="gardens-stats">
+                    <span>Total: <span id="totalGardens">0</span></span>
+                    <span>Active: <span id="activeGardens">0</span></span>
+                    <span>Inactive: <span id="inactiveGardens">0</span></span>
+                </div>
+                
+                <div class="gardens-list">
+                    <div class="gardens-container">
+                        <table class="gardens-table" id="gardensTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30%;">Garden Name</th>
+                                    <th style="width: 35%;">Location</th>
+                                    <th style="width: 15%;">Status</th>
+                                    <th style="width: 20%;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gardensTableBody">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section class="reports">
+                <h2>📈 Generate Reports</h2>
+                
+                <div class="report-filters">
+                    <div class="filter-row">
+                        <div class="form-group">
+                            <label for="reportStartDate">Start Date</label>
+                            <input type="date" id="reportStartDate">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="reportEndDate">End Date</label>
+                            <input type="date" id="reportEndDate">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="reportVolunteer">Volunteer Name (Optional)</label>
+                            <input type="text" id="reportVolunteer" placeholder="Enter volunteer name (leave blank for all)">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="reportGarden">Garden</label>
+                            <select id="reportGarden">
+                                <option value="">All Gardens</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="report-actions">
+                        <button id="generateReportBtn" class="btn btn-secondary">Generate Report</button>
+                        <button id="clearFiltersBtn" class="btn btn-outline">Clear Filters</button>
+                    </div>
+                </div>
+                
+                <div id="reportResults" class="report-results hidden">
+                    <div class="report-summary">
+                        <h3>Report Summary</h3>
+                        <p>Total Entries: <span id="reportTotalEntries">0</span></p>
+                        <p>Total Hours: <span id="reportTotalHours">0</span></p>
+                    </div>
+                    
+                    <div class="report-data">
+                        <h3>Detailed Results</h3>
+                        <div id="reportTable"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <div id="gardenModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalTitle">Add New Garden</h3>
+                    <button id="closeModal" class="close-btn">&times;</button>
+                </div>
+                
+                <form id="gardenForm">
+                    <div class="form-group">
+                        <label for="gardenName">Garden Name *</label>
+                        <input type="text" id="gardenName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gardenLocation">Location</label>
+                        <input type="text" id="gardenLocation" placeholder="Street address or general location">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gardenActive">Status</label>
+                        <select id="gardenActive">
+                            <option value="Yes">Active</option>
+                            <option value="No">Inactive</option>
+                        </select>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" id="cancelBtn" class="btn btn-outline">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Garden</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="loading" class="loading hidden">Processing...</div>
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        let currentGardens = [];
+        let editingGarden = null;
+
+        // Initialize admin portal
+        document.addEventListener('DOMContentLoaded', function() {
+            authenticateUser();
+            setupVolunteerLinks();
+        });
+        
+        // Set up volunteer form links with correct URL
+        function setupVolunteerLinks() {
+            const currentUrl = window.location.href;
+            const baseUrl = currentUrl.split('?')[0]; // Remove any existing parameters
+            
+            // Update all links back to volunteer form
+            document.querySelector('.volunteer-link').href = baseUrl; // Changed to select by class
+            
+            // These elements might not exist yet, so we'll update them when they're created
+            setTimeout(() => {
+                const returnLink = document.getElementById('returnLink');
+                const returnLinkError = document.getElementById('returnLinkError');
+                if (returnLink) returnLink.href = baseUrl;
+                if (returnLinkError) returnLinkError.href = baseUrl;
+            }, 1000);
+        }
+
+        // Authenticate admin user
+    function authenticateUser() {
+        console.log('Attempting to call google.script.run.authenticateAdmin(). typeof google.script.run:', typeof google.script.run); // ADD THIS LINE
+        google.script.run
+            .withSuccessHandler(handleAuthResult)
+            .withFailureHandler(handleAuthError)
+            .authenticateAdmin();
+    }
+
+        function handleAuthResult(result) {
+            const authContainer = document.getElementById('authContainer');
+            const adminContent = document.getElementById('adminContent');
+            const userInfo = document.getElementById('userInfo');
+            
+            if (result.isAdmin) {
+                authContainer.classList.add('hidden');
+                adminContent.classList.remove('hidden');
+                userInfo.textContent = `Welcome, ${result.userEmail}`;
+                
+                // Load admin data
+                loadDashboardStats();
+                loadGardens();
+                loadGardensForFilter();
+                setReportDateDefaults(); // Call new function to set default dates
+                
+                // Set up event listeners
+                setupEventListeners();
+            } else {
+                authContainer.innerHTML = `
+                    <div class="auth-card error">
+                        <h2>Access Denied</h2>
+                        <p>You don't have admin privileges for this system.</p>
+                        <p>Logged in as: ${result.userEmail}</p>
+                        <a href="https://script.google.com/macros/s/AKfycbyGx8K_ZcqRR2b5nKnX4rL128AvhbLi5AgkN3HGGujhcD9qpMuEaTvGz99URrPFikHn/exec" class="btn btn-primary">Return to Volunteer Form</a>
+                    </div>
+                `;
+                 // Update the dynamically created link as well
+                document.querySelector('.auth-card.error .btn-primary').href = "https://script.google.com/macros/s/AKfycbyGx8K_ZcqRR2b5nKnX4rL128AvhbLi5AgkN3HGGujhcD9qpMuEaTvGz99URrPFikHn/exec";
+            }
+        }
+
+        function handleAuthError(error) {
+            const authContainer = document.getElementById('authContainer');
+            authContainer.innerHTML = `
+                <div class="auth-card error">
+                    <h2>Authentication Error</h2>
+                    <p>Unable to verify your credentials: ${error.message}</p>
+                    <a href="https://script.google.com/macros/s/AKfycbyGx8K_ZcqRR2b5nKnX4rL128AvhbLi5AgkN3HGGujhcD9qpMuEaTvGz99URrPFikHn/exec" class="btn btn-primary">Return to Volunteer Form</a>
+                </div>
+            `;
+            // Update the dynamically created link as well
+            document.querySelector('.auth-card.error .btn-primary').href = "https://script.google.com/macros/s/AKfycbyGx8K_ZcqRR2b5nKnX4rL128AvhbLi5AgkN3HGGujhcD9qpMuEaTvGz99URrPFikHn/exec";
+        }
+
+        // Set up event listeners
+        function setupEventListeners() {
+            // Add garden button
+            document.getElementById('addGardenBtn').addEventListener('click', function() {
+                openGardenModal();
+            });
+
+            // Close modal buttons
+            document.getElementById('closeModal').addEventListener('click', closeGardenModal);
+            document.getElementById('cancelBtn').addEventListener('click', closeGardenModal);
+
+            // Garden form submission
+            document.getElementById('gardenForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                saveGarden();
+            });
+
+            // Report generation
+            document.getElementById('generateReportBtn').addEventListener('click', generateReport);
+            document.getElementById('clearFiltersBtn').addEventListener('click', clearReportFilters);
+
+            // Close modal when clicking outside
+            document.getElementById('gardenModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeGardenModal();
+                }
+            });
+
+            // Garden search functionality
+            document.getElementById('gardenSearchInput').addEventListener('input', function(e) {
+                filterGardens(e.target.value);
+            });
+        }
+
+        // Set default dates for the report filters
+        function setReportDateDefaults() {
+            const today = new Date();
+            
+            // Set End Date to current date
+            const endDate = today.toISOString().split('T')[0];
+            document.getElementById('reportEndDate').value = endDate;
+
+            // Set Start Date to the first day of the current month
+            const year = today.getFullYear();
+            const month = (today.getMonth() + 1).toString().padStart(2, '0'); // Months are 0-indexed
+            const startDate = `${year}-${month}-01`;
+            document.getElementById('reportStartDate').value = startDate;
+        }
+
+        // Load dashboard statistics
+        function loadDashboardStats() {
+            google.script.run
+                .withSuccessHandler(displayDashboardStats)
+                .withFailureHandler(handleError)
+                .getVolunteerStats();
+        }
+
+        function displayDashboardStats(result) {
+            if (result.success) {
+                document.getElementById('totalVolunteers').textContent = result.stats.totalVolunteers;
+                document.getElementById('totalHours').textContent = result.stats.totalHours.toFixed(1);
+                document.getElementById('totalEntries').textContent = result.stats.totalEntries;
+                document.getElementById('averageHours').textContent = result.stats.averageHours;
+            }
+        }
+
+        // Load gardens for management
+        function loadGardens() {
+            google.script.run
+                .withSuccessHandler(displayGardens)
+                .withFailureHandler(handleError)
+                .getAllGardens();
+        }
+
+        function displayGardens(result) {
+            if (result.success) {
+                currentGardens = result.gardens;
+                const tbody = document.getElementById('gardensTableBody');
+                
+                if (currentGardens.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="no-data">No gardens found. Click "Add New Garden" to get started.</td></tr>';
+                    updateGardenStats(0, 0, 0);
+                    return;
+                }
+                
+                renderGardensTable(currentGardens);
+                updateGardenStats();
+            }
+        }
+
+        function renderGardensTable(gardens) {
+            const tbody = document.getElementById('gardensTableBody');
+            let html = '';
+            
+            gardens.forEach(garden => {
+                const statusClass = garden.active === 'Yes' ? 'active' : 'inactive';
+                const statusText = garden.active === 'Yes' ? 'Active' : 'Inactive';
+                
+                html += `
+                    <tr class="${statusClass}">
+                        <td>
+                            <div class="garden-name">${garden.name}</div>
+                        </td>
+                        <td>
+                            <div class="garden-location">${garden.location || 'No location specified'}</div>
+                        </td>
+                        <td>
+                            <span class="garden-status ${statusClass}">${statusText}</span>
+                        </td>
+                        <td>
+                            <div class="garden-actions">
+                                <button onclick="editGarden(${garden.rowIndex})" class="btn btn-small btn-outline">Edit</button>
+                                <button onclick="deleteGarden(${garden.rowIndex}, '${garden.name.replace(/'/g, "\\'")}')" class="btn btn-small btn-danger">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+        }
+
+        function updateGardenStats(total, active, inactive) {
+            if (total === undefined) {
+                total = currentGardens.length;
+                active = currentGardens.filter(g => g.active === 'Yes').length;
+                inactive = currentGardens.filter(g => g.active === 'No').length;
+            }
+            
+            document.getElementById('totalGardens').textContent = total;
+            document.getElementById('activeGardens').textContent = active;
+            document.getElementById('inactiveGardens').textContent = inactive;
+        }
+
+        function filterGardens(searchTerm) {
+            if (!searchTerm.trim()) {
+                renderGardensTable(currentGardens);
+                updateGardenStats();
+                return;
+            }
+            
+            const filtered = currentGardens.filter(garden => {
+                const name = garden.name.toLowerCase();
+                const location = (garden.location || '').toLowerCase();
+                const search = searchTerm.toLowerCase();
+                
+                return name.includes(search) || location.includes(search);
+            });
+            
+            renderGardensTable(filtered);
+            
+            const total = filtered.length;
+            const active = filtered.filter(g => g.active === 'Yes').length;
+            const inactive = filtered.filter(g => g.active === 'No').length;
+            updateGardenStats(total, active, inactive);
+        }
+
+        // Load gardens for report filter dropdown
+        function loadGardensForFilter() {
+            google.script.run
+                .withSuccessHandler(populateGardenFilter)
+                .withFailureHandler(handleError)
+                .getGardens();
+        }
+
+        function populateGardenFilter(result) {
+            if (result.success) {
+                const select = document.getElementById('reportGarden');
+                select.innerHTML = '<option value="">All Gardens</option>';
+                
+                result.gardens.forEach(garden => {
+                    select.innerHTML += `<option value="${garden.name}">${garden.name}</option>`;
+                });
+            }
+        }
+
+        // Garden modal functions
+        function openGardenModal(gardenData = null) {
+            const modal = document.getElementById('gardenModal');
+            const title = document.getElementById('modalTitle');
+            const form = document.getElementById('gardenForm');
+            
+            if (gardenData) {
+                title.textContent = 'Edit Garden';
+                document.getElementById('gardenName').value = gardenData.name;
+                document.getElementById('gardenLocation').value = gardenData.location || '';
+                document.getElementById('gardenActive').value = gardenData.active;
+                editingGarden = gardenData;
+            } else {
+                title.textContent = 'Add New Garden';
+                form.reset();
+                editingGarden = null;
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeGardenModal() {
+            document.getElementById('gardenModal').classList.add('hidden');
+            document.getElementById('gardenForm').reset();
+            editingGarden = null;
+        }
+
+        function editGarden(rowIndex) {
+            const garden = currentGardens.find(g => g.rowIndex === rowIndex);
+            if (garden) {
+                openGardenModal(garden);
+            }
+        }
+
+        function deleteGarden(rowIndex, gardenName) {
+            if (confirm(`Are you sure you want to delete "${gardenName}"? This action cannot be undone.`)) {
+                showLoading(true);
+                
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        showLoading(false);
+                        if (result.success) {
+                            showStatus(result.message, 'success');
+                            loadGardens();
+                            loadGardensForFilter();
+                        } else {
+                            showStatus('Error: ' + result.message, 'error');
+                        }
+                    })
+                    .withFailureHandler(handleError)
+                    .deleteGarden(rowIndex);
+            }
+        }
+
+        function saveGarden() {
+            const gardenData = {
+                name: document.getElementById('gardenName').value.trim(),
+                location: document.getElementById('gardenLocation').value.trim(),
+                active: document.getElementById('gardenActive').value
+            };
+            
+            if (!gardenData.name) {
+                showStatus('Garden name is required', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            
+            if (editingGarden) {
+                gardenData.rowIndex = editingGarden.rowIndex;
+                google.script.run
+                    .withSuccessHandler(handleGardenSaveSuccess)
+                    .withFailureHandler(handleError)
+                    .updateGarden(gardenData);
+            } else {
+                google.script.run
+                    .withSuccessHandler(handleGardenSaveSuccess)
+                    .withFailureHandler(handleError)
+                    .addGarden(gardenData);
+            }
+        }
+
+        function handleGardenSaveSuccess(result) {
+            showLoading(false);
+            if (result.success) {
+                showStatus(result.message, 'success');
+                closeGardenModal();
+                loadGardens();
+                loadGardensForFilter();
+                // Clear search when gardens are reloaded
+                document.getElementById('gardenSearchInput').value = '';
+            } else {
+                showStatus('Error: ' + result.message, 'error');
+            }
+        }
+
+        // Report generation
+        function generateReport() {
+            // Get filter values with explicit debugging
+            const startDateEl = document.getElementById('reportStartDate');
+            const endDateEl = document.getElementById('reportEndDate');
+            const volunteerNameEl = document.getElementById('reportVolunteer');
+            const gardenEl = document.getElementById('reportGarden');
+            
+            console.log('Form elements found:', {
+                startDateEl: !!startDateEl,
+                endDateEl: !!endDateEl,
+                volunteerNameEl: !!volunteerNameEl,
+                gardenEl: !!gardenEl
+            });
+            
+            let startDate = startDateEl ? startDateEl.value : '';
+            let endDate = endDateEl ? endDateEl.value : '';
+            const volunteerName = volunteerNameEl ? volunteerNameEl.value.trim() : '';
+            const garden = gardenEl ? gardenEl.value : '';
+            
+            console.log('Raw form values:', {
+                startDate: startDate,
+                endDate: endDate,
+                volunteerName: volunteerName,
+                garden: garden
+            });
+            
+            // If dates are empty, set wide defaults to catch all data
+            if (!startDate || !endDate) {
+                console.log('Empty dates detected, setting wide defaults');
+                
+                if (!startDate) {
+                    startDate = '2024-01-01';  // Covers all sample data
+                    if (startDateEl) startDateEl.value = startDate;
+                }
+                if (!endDate) {
+                    endDate = '2025-12-31';    // Future date to catch everything
+                    if (endDateEl) endDateEl.value = endDate;
+                }
+            }
+            
+            const filters = {
+                startDate: startDate,
+                endDate: endDate,
+                volunteerName: volunteerName,
+                garden: garden
+            };
+            
+            console.log('Final filters being sent:', filters);
+            
+            showLoading(true);
+            showStatus('Generating report...', 'info');
+            
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('Report result received:', result);
+                    displayReport(result);
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Report generation failed:', error);
+                    handleError(error);
+                })
+                .generateReport(filters);
+        }
+
+        function displayReport(result) {
+            console.log('displayReport called with:', result);
+            showLoading(false);
+            
+            // Check if the report results element exists
+            const reportResults = document.getElementById('reportResults');
+            console.log('reportResults element found:', reportResults);
+            
+            if (!reportResults) {
+                console.error('reportResults element not found!');
+                showStatus('Error: Report display area not found', 'error');
+                return;
+            }
+            
+            // Handle null or undefined result
+            if (!result) {
+                console.error('Result is null or undefined');
+                showStatus('Error: No response received from server', 'error');
+                return;
+            }
+            
+            if (result && result.success) {
+                console.log('Report data length:', result.data ? result.data.length : 'undefined');
+                console.log('Report summary:', result.summary);
+                
+                // Force show the results section
+                reportResults.classList.remove('hidden');
+                reportResults.style.display = 'block';
+                reportResults.style.visibility = 'visible';
+                
+                // Remove debug styling
+                reportResults.style.border = '';
+                reportResults.style.minHeight = '';
+                
+                console.log('Made reportResults visible');
+                
+                // Update summary
+                const totalEntriesEl = document.getElementById('reportTotalEntries');
+                const totalHoursEl = document.getElementById('reportTotalHours');
+                
+                if (totalEntriesEl && totalHoursEl && result.summary) {
+                    totalEntriesEl.textContent = result.summary.totalEntries;
+                    totalHoursEl.textContent = result.summary.totalHours.toFixed(1);
+                    console.log('Updated summary elements');
+                } else {
+                    console.error('Summary elements not found or no summary data');
+                }
+                
+                // Create table
+                const tableContainer = document.getElementById('reportTable');
+                console.log('tableContainer found:', tableContainer);
+                
+                if (!tableContainer) {
+                    console.error('reportTable element not found!');
+                    return;
+                }
+                
+                if (!result.data || result.data.length === 0) {
+                    tableContainer.innerHTML = '<p class="no-data" style="padding: 2rem; text-align: center; font-size: 1.2rem;">No volunteer hours found matching the selected criteria.</p>';
+                    showStatus('No data found for the selected filters', 'info');
+                    console.log('No data to display');
+                    return;
+                }
+                
+                console.log('Creating table with', result.data.length, 'rows');
+                
+                let tableHTML = `
+                    <div style="overflow-x: auto;">
+                        <table class="report-table" style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #f0f0f0;">
+                                    <th style="padding: 1rem; border: 1px solid #ccc;">Date Submitted</th>
+                                    <th style="padding: 1rem; border: 1px solid #ccc;">Volunteer Name</th>
+                                    <th style="padding: 1rem; border: 1px solid #ccc;">Email</th>
+                                    <th style="padding: 1rem; border: 1px solid #ccc;">Start Date</th>
+                                    <th style="padding: 1rem; border: 1px solid #ccc;">End Date</th>
+                                    <th style="padding: 1rem; border: 1px solid #ccc;">Gardens</th>
+                                    <th style="padding: 1rem; border: 1px solid #ccc;">Hours</th>
+                                    <th style="padding: 1rem; border: 1px solid #ccc;">Comments</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                result.data.forEach((entry, index) => {
+                    console.log('Processing entry', index, entry);
+                    const startDate = new Date(entry.startDate).toLocaleDateString();
+                    const endDate = entry.endDate ? new Date(entry.endDate).toLocaleDateString() : startDate;
+                    const submittedDate = new Date(entry.timestamp).toLocaleDateString();
+                    
+                    tableHTML += `
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">${submittedDate}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">${entry.volunteerName}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">${entry.email}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">${startDate}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">${endDate}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">${entry.gardens}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">${entry.hours}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">${entry.comments || ''}</td>
+                        </tr>
+                    `;
+                });
+                
+                tableHTML += '</tbody></table></div>';
+                tableContainer.innerHTML = tableHTML;
+                
+                console.log('Table HTML created and inserted');
+                
+                showStatus('Report generated successfully! Check below for results.', 'success');
+                
+                // Scroll to results
+                setTimeout(() => {
+                    console.log('Scrolling to results');
+                    reportResults.scrollIntoView({ 
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }, 200);
+                
+            } else {
+                console.error('Report generation failed:', result);
+                const errorMsg = result && result.message ? result.message : 'Unknown error occurred';
+                showStatus('Error generating report: ' + errorMsg, 'error');
+            }
+        }
+
+        function clearReportFilters() {
+            document.getElementById('reportStartDate').value = '';
+            document.getElementById('reportEndDate').value = '';
+            document.getElementById('reportVolunteer').value = '';
+            document.getElementById('reportGarden').value = '';
+            
+            const reportResults = document.getElementById('reportResults');
+            reportResults.classList.add('hidden');
+            
+            showStatus('Filters cleared', 'info');
+        }
+
+        // Utility functions
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            if (show) {
+                loading.classList.remove('hidden');
+            } else {
+                loading.classList.add('hidden');
+            }
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    if (status.className.includes(type)) {
+                        status.textContent = '';
+                        status.className = 'status';
+                    }
+                }, 5000);
+            }
+        }
+
+        function handleError(error) {
+            showLoading(false);
+            console.error('Error:', error);
+            showStatus('An error occurred: ' + error.message, 'error');
+        }
+    </script>
+</body>
+</html>
