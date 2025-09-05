@@ -1,45 +1,26 @@
 # VolunteerHours
 
-This project is an Apps Script application managed locally with `clasp` and version controlled with Git.
+This project is an Apps Script application managed locally with `clasp` and version controlled with Git, with the help of the Gemini CLI.
 
 ## Synchronization Workflow
 
-To keep your code synchronized across Google Apps Script, your local machine, and this GitHub repository, follow these workflows.
+To keep your code synchronized across Google Apps Script, your local machine, and this GitHub repository, tell Gemini what you want to do.
 
-### Workflow 1: Pushing Local Changes to GitHub
+### Workflow 1: Save Local Changes to GitHub
 
-Use this when you have made changes locally that you want to save to GitHub.
+Use this when you have made changes locally in Cursor that you want to save to your GitHub repository.
 
-```bash
-# Stage all your changes
-git add .
+1.  Save your file changes in the editor.
+2.  Tell Gemini: **"Commit my changes to GitHub with the message 'Your descriptive message'."**
 
-# Commit your changes with a descriptive message
-git commit -m "Your descriptive message about the changes"
+### Workflow 2: Push Local Changes to Apps Script
 
-# Push your commit to GitHub
-git push
-```
+Use this to upload your local code to the Google Apps Script online editor to test or deploy it.
 
-### Workflow 2: Pushing Local Changes to Apps Script
+- Tell Gemini: **"Push my changes to Apps Script."**
 
-Use this to upload your local code to the Google Apps Script online editor.
+### Workflow 3: Sync Changes from Apps Script to GitHub
 
-```bash
-# Tell Gemini to push the changes for you, or run:
-clasp push
-```
+Use this if you or someone else made changes in the online editor and you need to save them to the GitHub repository.
 
-### Workflow 3: Pulling Remote Apps Script Changes to Local
-
-Use this if you or someone else made changes in the online editor and you need to bring them to your local machine before committing to GitHub.
-
-```bash
-# Tell Gemini to pull the changes for you, or run:
-clasp pull
-
-# After pulling, commit the updated files to GitHub
-git add .
-git commit -m "Sync changes from Apps Script editor"
-git push
-```
+- Tell Gemini: **"Pull the latest changes from Apps Script and commit them to GitHub."**
