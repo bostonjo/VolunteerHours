@@ -5,6 +5,20 @@ const CONFIG = {
   ADMIN_EMAIL: 'john.biske@gmail.com' // Admin email address
 };
 
+// Authorization validation function
+function validatePermissions() {
+  try {
+    const authInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
+    if (authInfo.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.REQUIRED) {
+      throw new Error('Additional authorization required. Please reauthorize the application.');
+    }
+    return true;
+  } catch (e) {
+    console.error('Authorization validation failed:', e.message);
+    return false;
+  }
+}
+
 // Test function
 function testAuthorization() {
   Logger.log('Running testAuthorization...');
@@ -55,7 +69,7 @@ function initializeSheets() {
     
     const volunteerWorksheet = volunteerSheet.getActiveSheet();
     if (volunteerWorksheet.getLastRow() === 0) {
-      volunteerWorksheet.getRange(1, 1, 1, 8).setValues([[
+      volunteerWorksheet.getRange(1, 1, 1, 8).setValues([[ 
         'Timestamp', 'Volunteer Name', 'Email', 'Start Date', 'End Date', 'Gardens', 'Hours', 'Comments'
       ]]);
       volunteerWorksheet.getRange(1, 1, 1, 8).setFontWeight('bold');
@@ -101,14 +115,25 @@ function initializeSheets() {
   }
 }
 
-// Get list of active gardens
+// Get list of active gardens with caching
 function getGardens() {
   try {
+    // Check cache first
+    const cache = CacheService.getScriptCache();
+    const cachedGardens = cache.get('gardens');
+    
+    if (cachedGardens) {
+      return JSON.parse(cachedGardens);
+    }
+    
+    // If not in cache, fetch from sheet
     const sheet = SpreadsheetApp.openById(CONFIG.GARDENS_SHEET_ID).getActiveSheet();
     const data = sheet.getDataRange().getValues();
     
     if (data.length <= 1) {
-      return { success: true, gardens: [] };
+      const result = { success: true, gardens: [] };
+      cache.put('gardens', JSON.stringify(result), 300); // Cache for 5 minutes
+      return result;
     }
     
     const gardens = [];
@@ -121,11 +146,40 @@ function getGardens() {
       }
     }
     
-    return { success: true, gardens: gardens };
+    const result = { success: true, gardens: gardens };
+    // Cache the result for 5 minutes
+    cache.put('gardens', JSON.stringify(result), 300);
+    
+    return result;
   } catch (error) {
     console.error('Error getting gardens:', error);
     return { success: false, message: error.toString() };
   }
+}
+
+// Clear gardens cache when gardens are modified
+function clearGardensCache() {
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.remove('gardens');
+  } catch (error) {
+    console.error('Error clearing gardens cache:', error);
+  }
+}
+
+// Sanitize user input to prevent XSS attacks
+function sanitizeInput(input) {
+  if (typeof input !== 'string') {
+    return input;
+  }
+  
+  return input
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+    .trim();
 }
 
 // Submit volunteer hours
@@ -133,33 +187,45 @@ function submitVolunteerHours(formData) {
   try {
     const sheet = SpreadsheetApp.openById(CONFIG.VOLUNTEER_HOURS_SHEET_ID).getActiveSheet();
     
+    // Sanitize input data
+    const sanitizedData = {
+      volunteerName: sanitizeInput(formData.volunteerName),
+      email: sanitizeInput(formData.email),
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      gardens: Array.isArray(formData.gardens) 
+        ? formData.gardens.map(garden => sanitizeInput(garden)).join(', ')
+        : sanitizeInput(formData.gardens),
+      hours: parseFloat(formData.hours) || 0,
+      comments: sanitizeInput(formData.comments || '')
+    };
+    
     const timestamp = new Date();
-    const startDate = new Date(formData.startDate);
-    const endDate = formData.endDate ? new Date(formData.endDate) : startDate;
-    const gardens = Array.isArray(formData.gardens) ? formData.gardens.join(', ') : formData.gardens;
+    const startDate = new Date(sanitizedData.startDate);
+    const endDate = sanitizedData.endDate ? new Date(sanitizedData.endDate) : startDate;
     
     sheet.appendRow([
       timestamp,
-      formData.volunteerName,
-      formData.email,
+      sanitizedData.volunteerName,
+      sanitizedData.email,
       startDate,
       endDate,
-      gardens,
-      formData.hours,
-      formData.comments || ''
+      sanitizedData.gardens,
+      sanitizedData.hours,
+      sanitizedData.comments
     ]);
     
     // Send confirmation email to volunteer
     try {
       const emailBody = `
-Dear ${formData.volunteerName},
+Dear ${sanitizedData.volunteerName},
 
 Thank you for submitting your volunteer hours! Here are the details we received:
 
-Date(s): ${formData.startDate}${formData.endDate ? ' to ' + formData.endDate : ''}
-Garden(s): ${gardens}
-Hours: ${formData.hours}
-Comments: ${formData.comments || 'None'}
+Date(s): ${sanitizedData.startDate}${sanitizedData.endDate ? ' to ' + sanitizedData.endDate : ''}
+Garden(s): ${sanitizedData.gardens}
+Hours: ${sanitizedData.hours}
+Comments: ${sanitizedData.comments || 'None'}
 
 Your contribution is greatly appreciated!
 
@@ -168,7 +234,7 @@ Volunteer Coordination Team
       `;
       
       GmailApp.sendEmail(
-        formData.email,
+        sanitizedData.email,
         'Volunteer Hours Submission Confirmation',
         emailBody
       );
@@ -190,12 +256,12 @@ Volunteer Coordination Team
 // Admin authentication
 function authenticateAdmin(email) { // The 'email' parameter here is not used by Session.getActiveUser()
   const userEmail = Session.getActiveUser().getEmail();
-  Logger.log('Current logged-in user email: ' + userEmail); // Add this
-  Logger.log('Configured admin email: ' + CONFIG.ADMIN_EMAIL); // Add this
+  Logger.log('Current logged-in user email: ' + userEmail);
+  Logger.log('Configured admin email: ' + CONFIG.ADMIN_EMAIL);
 
   const isAdmin = userEmail === CONFIG.ADMIN_EMAIL;
   
-  Logger.log('Is user admin? ' + isAdmin); // Add this
+  Logger.log('Is user admin? ' + isAdmin);
   
   return {
     success: isAdmin,
@@ -237,11 +303,18 @@ function addGarden(gardenData) {
   try {
     const sheet = SpreadsheetApp.openById(CONFIG.GARDENS_SHEET_ID).getActiveSheet();
     
+    // Sanitize input data
+    const sanitizedName = sanitizeInput(gardenData.name);
+    const sanitizedLocation = sanitizeInput(gardenData.location);
+    
     sheet.appendRow([
-      gardenData.name,
-      gardenData.location,
+      sanitizedName,
+      sanitizedLocation,
       'Yes'
     ]);
+    
+    // Clear cache after modification
+    clearGardensCache();
     
     return { success: true, message: 'Garden added successfully' };
   } catch (error) {
@@ -255,11 +328,19 @@ function updateGarden(gardenData) {
   try {
     const sheet = SpreadsheetApp.openById(CONFIG.GARDENS_SHEET_ID).getActiveSheet();
     
-    sheet.getRange(gardenData.rowIndex, 1, 1, 3).setValues([[
-      gardenData.name,
-      gardenData.location,
-      gardenData.active
+    // Sanitize input data
+    const sanitizedName = sanitizeInput(gardenData.name);
+    const sanitizedLocation = sanitizeInput(gardenData.location);
+    const sanitizedActive = sanitizeInput(gardenData.active);
+    
+    sheet.getRange(gardenData.rowIndex, 1, 1, 3).setValues([[ 
+      sanitizedName,
+      sanitizedLocation,
+      sanitizedActive
     ]]);
+    
+    // Clear cache after modification
+    clearGardensCache();
     
     return { success: true, message: 'Garden updated successfully' };
   } catch (error) {
@@ -273,6 +354,9 @@ function deleteGarden(rowIndex) {
   try {
     const sheet = SpreadsheetApp.openById(CONFIG.GARDENS_SHEET_ID).getActiveSheet();
     sheet.deleteRow(rowIndex);
+    
+    // Clear cache after modification
+    clearGardensCache();
     
     return { success: true, message: 'Garden deleted successfully' };
   } catch (error) {
@@ -322,7 +406,8 @@ function generateReport(filters) {
     // Process each row
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      console.log(`\n--- Processing Row ${i} ---`);
+      console.log(`
+--- Processing Row ${i} ---`);
       console.log('Raw row data:', row);
       
       // Skip completely empty rows
@@ -525,9 +610,9 @@ function getVolunteerStats() {
         averageHours: parseFloat(averageHours)
       }
     };
-    
   } catch (error) {
     console.error('Error getting volunteer stats:', error);
     return { success: false, message: error.toString() };
   }
 }
+
